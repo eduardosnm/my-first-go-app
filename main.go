@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -18,39 +19,46 @@ type UserData struct {
 	numberOfTickets uint
 }
 
+// sync provides basic synchronization functionality
+var wg = sync.WaitGroup{}
+
 func main() {
 
 	greetUsers()
 
-	for remainingTickets > 0 && len(bookings) < 50 {
-		firstName, lastName, email, userTickets := getUserInput()
+	firstName, lastName, email, userTickets := getUserInput()
 
-		isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets)
+	isValidName, isValidEmail, isValidTicketNumber := validateUserInput(firstName, lastName, email, userTickets)
 
-		if isValidName && isValidEmail && isValidTicketNumber {
-			bookTicket(userTickets, firstName, lastName, email)
-			go sendTicket(userTickets, firstName, lastName, email)
+	if isValidName && isValidEmail && isValidTicketNumber {
 
-			firstNames := getFirstNames()
-			fmt.Printf("The first names of bookings are: %v\n", firstNames)
+		bookTicket(userTickets, firstName, lastName, email)
 
-			if remainingTickets == 0 {
-				// end program
-				fmt.Println("Our conference is booked out. Come back next year.")
-				break
-			}
-		} else {
-			if !isValidName {
-				fmt.Println("First name or last name you entered is too short")
-			}
-			if !isValidEmail {
-				fmt.Println("Email addres you entered doesn't contain @ sign")
-			}
-			if !isValidTicketNumber {
-				fmt.Println("Number of tickets you entered is invalid")
-			}
+		// set the number of goroutines to wait for (increase the counter by the provided number)
+		wg.Add(1)
+		go sendTicket(userTickets, firstName, lastName, email)
+
+		firstNames := getFirstNames()
+		fmt.Printf("The first names of bookings are: %v\n", firstNames)
+
+		if remainingTickets == 0 {
+			// end program
+			fmt.Println("Our conference is booked out. Come back next year.")
+		}
+	} else {
+		if !isValidName {
+			fmt.Println("First name or last name you entered is too short")
+		}
+		if !isValidEmail {
+			fmt.Println("Email addres you entered doesn't contain @ sign")
+		}
+		if !isValidTicketNumber {
+			fmt.Println("Number of tickets you entered is invalid")
 		}
 	}
+
+	// blocks until the WaitGroup counter is 0
+	wg.Wait()
 }
 
 func bookTicket(userTickets uint, firstName string, lastName string, email string) {
@@ -115,4 +123,8 @@ func sendTicket(userTickets uint, firstName string, lastName string, email strin
 	fmt.Println("##############")
 	fmt.Printf("Sending ticket:\n %v \nto email address %v\n", ticket, email)
 	fmt.Println("##############")
+
+	// decrements the WaitGroup counter by 1.
+	// So this is called by the gouroutine to indicate that it's finished
+	wg.Done()
 }
